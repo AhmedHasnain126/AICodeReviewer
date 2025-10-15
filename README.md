@@ -37,8 +37,9 @@ An intelligent full-stack application that leverages the Google Gemini API to pr
 ## Getting Started 🚀
 
 Follow these instructions to get a local copy of the project up and running.
+```
 
-### Prerequisites
+## Prerequisites
 
 -   **Node.js**: Version 18.x or later.
 -   **PostgreSQL**: A running instance of PostgreSQL.
