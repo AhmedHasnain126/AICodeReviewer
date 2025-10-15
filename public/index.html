@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Code Reviewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .prose pre {
+            background-color: #1f2937;
+            color: #d1d5db;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+        }
+        .prose code {
+            font-family: monospace;
+        }
+        .loader {
+            border-top-color: #3498db;
+            -webkit-animation: spin 1s linear infinite;
+            animation: spin 1s linear infinite;
+        }
+        @-webkit-keyframes spin {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">AI Code Reviewer</h1>
+            <p class="text-gray-600 mt-2">Upload your code files and get an expert analysis powered by Gemini.</p>
+        </header>
+
+        <!-- Main View: Upload Form and Reports List -->
+        <div id="main-view">
+            <!-- Upload Form Card -->
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h2 class="text-2xl font-semibold mb-4 border-b pb-3">Submit a New Review</h2>
+                <form id="upload-form" class="space-y-4">
+                    <div>
+                        <label for="file-upload" class="block text-sm font-medium text-gray-700">Code File</label>
+                        <input id="file-upload" name="file" type="file" required class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+                    <div>
+                        <label for="prompt" class="block text-sm font-medium text-gray-700">Review Instructions</label>
+                        <textarea id="prompt" name="prompt" rows="3" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="e.g., 'Check for potential bugs and suggest performance improvements.'"></textarea>
+                    </div>
+                    <div class="text-right">
+                        <button type="submit" class="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            <span id="submit-text">Analyze Code</span>
+                            <div id="submit-loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-5 w-5 ml-2 hidden"></div>
+                        </button>
+                    </div>
+                </form>
+                 <div id="form-error" class="mt-4 text-sm text-red-600"></div>
+            </div>
+
+            <!-- Reports List Card -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4 border-b pb-3">Past Reviews</h2>
+                <div id="reports-list-container" class="space-y-3">
+                    <!-- Reports will be dynamically inserted here -->
+                     <div id="reports-loader" class="flex justify-center py-4">
+                        <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24"></div>
+                    </div>
+                    <p id="no-reports-message" class="text-gray-500 text-center hidden">No reports found. Submit a new review to get started!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detail View: Shows a single report -->
+        <div id="detail-view" class="hidden">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <button id="back-button" class="mb-4 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                    &larr; Back to List
+                </button>
+                <div id="report-content" class="prose max-w-none">
+                    <!-- Full report content will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const API_BASE_URL = 'http://localhost:5000'; // Your backend server URL
+
+            // View elements
+            const mainView = document.getElementById('main-view');
+            const detailView = document.getElementById('detail-view');
+
+            // Form elements
+            const uploadForm = document.getElementById('upload-form');
+            const formError = document.getElementById('form-error');
+            const submitButtonText = document.getElementById('submit-text');
+            const submitButtonLoader = document.getElementById('submit-loader');
+
+            // Reports list elements
+            const reportsListContainer = document.getElementById('reports-list-container');
+            const reportsLoader = document.getElementById('reports-loader');
+            const noReportsMessage = document.getElementById('no-reports-message');
+
+            // Detail view elements
+            const reportContent = document.getElementById('report-content');
+            const backButton = document.getElementById('back-button');
+
+            /**
+             * Switches between the main list view and the detail view.
+             * @param {string} viewName - The name of the view to show ('main' or 'detail').
+             */
+            const showView = (viewName) => {
+                mainView.classList.toggle('hidden', viewName !== 'main');
+                detailView.classList.toggle('hidden', viewName !== 'detail');
+            };
+
+            /**
+             * Fetches all past review reports from the backend.
+             */
+            const fetchReports = async () => {
+                reportsLoader.classList.remove('hidden');
+                noReportsMessage.classList.add('hidden');
+                reportsListContainer.innerHTML = ''; // Clear previous list
+                reportsListContainer.appendChild(reportsLoader);
+
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/reports`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch reports.');
+                    }
+                    const reports = await response.json();
+                    renderReportsList(reports);
+                } catch (error) {
+                    reportsListContainer.innerHTML = `<p class="text-red-500 text-center">Error: ${error.message}</p>`;
+                } finally {
+                    reportsLoader.classList.add('hidden');
+                }
+            };
+
+            /**
+             * Renders the list of reports in the UI.
+             * @param {Array} reports - An array of report objects.
+             */
+            const renderReportsList = (reports) => {
+                reportsListContainer.innerHTML = ''; // Clear loader
+                if (reports.length === 0) {
+                    noReportsMessage.classList.remove('hidden');
+                    return;
+                }
+
+                reports.forEach(report => {
+                    const reportElement = document.createElement('div');
+                    reportElement.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors';
+                    
+                    const reportDate = new Date(report.created_at).toLocaleString();
+
+                    reportElement.innerHTML = `
+                        <div>
+                            <p class="font-semibold text-gray-800">${report.filename}</p>
+                            <p class="text-sm text-gray-500">Submitted: ${reportDate}</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button data-id="${report.id}" class="view-btn text-blue-600 hover:text-blue-800 font-medium text-sm">View</button>
+                            <button data-id="${report.id}" class="delete-btn text-red-600 hover:text-red-800 font-medium text-sm">Delete</button>
+                        </div>
+                    `;
+                    reportsListContainer.appendChild(reportElement);
+                });
+            };
+
+            /**
+             * Fetches and displays the details of a single report.
+             * @param {string} reportId - The ID of the report to fetch.
+             */
+            const fetchReportDetails = async (reportId) => {
+                showView('detail');
+                reportContent.innerHTML = `<div class="flex justify-center py-8"><div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div></div>`;
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/reports/${reportId}`);
+                    if (!response.ok) {
+                        throw new Error('Report not found or server error.');
+                    }
+                    const report = await response.json();
+                    
+                    // Use 'marked' library to parse Markdown from the API into HTML
+                    const reportHtml = marked.parse(report.report);
+                    
+                    reportContent.innerHTML = `
+                        <h2 class="text-3xl font-bold mb-2">${report.filename}</h2>
+                        <p class="text-sm text-gray-500 mb-4">Reviewed on: ${new Date(report.created_at).toLocaleString()}</p>
+                        <div class="mb-6 p-4 bg-gray-50 rounded-md border">
+                            <h4 class="font-semibold text-lg mb-2">Review Instructions:</h4>
+                            <p class="text-gray-700">${report.review_prompt}</p>
+                        </div>
+                        <hr class="my-6">
+                        <div class="prose-p:mb-4 prose-h3:font-semibold prose-h3:text-xl prose-h3:mt-6 prose-h3:mb-3">${reportHtml}</div>
+                    `;
+                } catch (error) {
+                    reportContent.innerHTML = `<p class="text-red-500">Error fetching report: ${error.message}</p>`;
+                }
+            };
+            
+            /**
+             * Deletes a report after confirmation.
+             * @param {string} reportId - The ID of the report to delete.
+             */
+            const deleteReport = async (reportId) => {
+                if (!confirm('Are you sure you want to delete this report?')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/reports/${reportId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok && response.status !== 204) {
+                        throw new Error('Failed to delete the report.');
+                    }
+                    // Refresh the list after successful deletion
+                    fetchReports(); 
+                } catch (error) {
+                    alert(`Error: ${error.message}`);
+                }
+            };
+
+            // Event listener for the upload form submission
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                formError.textContent = '';
+                submitButtonText.classList.add('hidden');
+                submitButtonLoader.classList.remove('hidden');
+                uploadForm.querySelector('button[type="submit"]').disabled = true;
+
+                const formData = new FormData(uploadForm);
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.error || 'An unknown error occurred.');
+                    }
+                    
+                    uploadForm.reset();
+                    // Fetch the new list of reports and show the full details of the new one
+                    await fetchReports();
+                    fetchReportDetails(result.review.id);
+
+                } catch (error) {
+                    formError.textContent = `Error: ${error.message}`;
+                } finally {
+                    submitButtonText.classList.remove('hidden');
+                    submitButtonLoader.classList.add('hidden');
+                    uploadForm.querySelector('button[type="submit"]').disabled = false;
+                }
+            });
+
+            // Event listener for clicks on the reports list (event delegation)
+            reportsListContainer.addEventListener('click', (e) => {
+                const target = e.target;
+                const reportId = target.dataset.id;
+                
+                if (reportId && target.classList.contains('view-btn')) {
+                    fetchReportDetails(reportId);
+                }
+                
+                if (reportId && target.classList.contains('delete-btn')) {
+                    deleteReport(reportId);
+                }
+            });
+
+            // Event listener for the 'back' button in the detail view
+            backButton.addEventListener('click', () => {
+                showView('main');
+            });
+
+            // Initial load
+            fetchReports();
+        });
+    </script>
+</body>
+</html>
