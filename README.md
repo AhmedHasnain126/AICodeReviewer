@@ -25,11 +25,10 @@ An intelligent full-stack application that leverages the Google Gemini API to pr
 ```plaintext
 /
 ├── public/
-│   ├── index.html      # React app host
-│   └── App.jsx         # React application
+│   ├── index.html      # HTML frontend
+│   
 ├── uploads/            # (Git ignored) Temp folder for file uploads
 ├── .env                # (Git ignored) Environment variables
-├── .env.example        # Example environment file
 ├── .gitignore          # Specifies files for Git to ignore
 ├── db.js               # PostgreSQL connection setup
 ├── package.json        # Project dependencies
