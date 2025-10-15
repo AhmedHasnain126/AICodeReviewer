@@ -15,7 +15,7 @@ An intelligent full-stack application that leverages the Google Gemini API to pr
 ## Tech Stack 🛠️
 
 -   **Backend**: Node.js, Express.js
--   **Frontend**: React (using CDN for simplicity)
+-   **Frontend**: HTML
 -   **Database**: PostgreSQL
 -   **AI Model**: Google Gemini API
 -   **Styling**: Tailwind CSS
