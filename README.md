@@ -1,6 +1,6 @@
 # AI Code Reviewer 🤖
 
-![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg) ![Express.js](https://img.shields.io/badge/Express.js-4.x-blue.svg) ![React](https://img.shields.io/badge/React-17.x-cyan.svg) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14.x-purple.svg)
+![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg) ![Express.js](https://img.shields.io/badge/Express.js-4.x-blue.svg) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14.x-purple.svg)
 
 An intelligent full-stack application that leverages the Google Gemini API to provide expert code reviews. Upload a code file, provide instructions, and receive a detailed analysis covering potential bugs, performance improvements, and best practices.
 
